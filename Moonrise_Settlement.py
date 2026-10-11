@@ -5,26 +5,111 @@ Leo Schwarz, Adam Schwarz, Jeffrey Huang, Divyesh Purohit
 10/11/2026
 """
 
-
 import random
 import threading
-from flask import Flask, render_template, session, redirect, url_for, jsonify
+from flask import Flask, jsonify, render_template, request
 
-# Flask setup
 app = Flask(__name__)
-# This secret key is REQUIRED to use session variable tracking memory safely
 app.secret_key = 'moonrise_secret_colony_key'
 
 @app.route("/")
 def home():
-    return render_template("settlements.html", pop=pop)
+    return render_template("index.html")
 
-@app.route("/api/population")
-def population():
-    return jsonify(population=pop)
+@app.route("/game")
+def game():
+    return render_template(
+        "settlements.html",
+        pop=pop,
+        res=res,
+        fund=fund,
+        rel=rel,
+    )
 
 
+@app.route("/api/stats")
+def stats():
+    return jsonify(population=pop, resources=res, funding=fund, relations=rel)
 
+@app.route("/api/state")
+def game_state():
+    with game_lock:
+        ensure_current_event()
+        return jsonify(state_payload())
+
+@app.route("/api/action", methods=["POST"])
+@app.route("/api/action", methods=["POST"])
+def submit_action():
+    global current_event, upcoming_events, game_turn, game_over, game_message, last_result
+    global pop, res, fund, rel  # Explicitly pull in the global stat tracking variables
+
+    payload = request.get_json()
+    answer = payload.get("answer") if isinstance(payload, dict) else None
+    if answer not in ("yes", "no"):
+        return jsonify(error="Answer must be 'yes' or 'no'."), 400
+
+    with game_lock:
+        if game_over:
+            return jsonify(error="The game is over.", **state_payload()), 409
+
+        # 1. Sync engine dictionary with your live global variables before running the turn
+        all_stats["Population"] = pop
+        all_stats["Resources"] = res
+        all_stats["Funding"] = fund
+        all_stats["Relations"] = rel
+
+        ensure_current_event()
+        dependent_event, upcoming_events, last_result = do_turn(
+            all_stats,
+            upcoming_events,
+            answer=answer,
+            event=current_event,
+        )
+        current_event = None
+
+        # 2. Write the freshly calculated dictionary outputs back to your global variables
+        pop = all_stats["Population"]
+        res = all_stats["Resources"]
+        fund = all_stats["Funding"]
+        rel = all_stats["Relations"]
+
+        if dependent_event:
+            events_running[dependent_event] = events[dependent_event]
+
+        next_event = upcoming_events[0] if upcoming_events else None
+        if next_event in list_of_dependent_event:
+            events_running.pop(next_event, None)
+
+        game_turn += 1
+        game_over, game_message = get_game_result(game_turn)
+        ensure_current_event()
+        return jsonify(state_payload(result=last_result))
+
+@app.route("/api/reset", methods=["POST"])
+def reset_game():
+    global pop, res, fund, rel, u, run, upcoming_events, all_stats
+    global events_running, current_event, game_turn, game_over, game_message, last_result
+
+    with game_lock:
+        pop, res, fund, rel, u = 50.0, 50.0, 50.0, 50.0, 1
+        passive_prfr_regen[:] = [0, 0, 0, 0]
+        run = True
+        events_running = events_running_initial()
+        upcoming_events = random.sample(list(events_running), min(5, len(events_running)))
+        current_event = None
+        game_turn = 1
+        game_over = False
+        game_message = ""
+        last_result = ""
+        all_stats = {
+            "Population": pop,
+            "Resources": res,
+            "Funding": fund,
+            "Relations": rel,
+            "You": u,
+        }
+        ensure_current_event()
+        return jsonify(state_payload())
 
 # setup variables
 pop = 50.0 # population
@@ -162,6 +247,63 @@ for dep_event in list_of_dependent_event:
         events_running.pop(dep_event)
 
 
+def events_running_initial():
+    available_events = events.copy()
+    for dep_event in list_of_dependent_event:
+        available_events.pop(dep_event, None)
+    return available_events
+
+current_event = None
+game_turn = 1
+game_over = False
+game_message = ""
+last_result = ""
+game_lock = threading.Lock()
+
+
+def ensure_current_event():
+    global current_event, upcoming_events
+    if current_event is None and not game_over:
+        current_event, upcoming_events = choose_event(upcoming_events)
+
+
+def state_payload(result=""):
+    return {
+        "population": pop,
+        "resources": res,
+        "funding": fund,
+        "relations": rel,
+        "prompt": current_event[0] if current_event and not game_over else "",
+        "round": game_turn,
+        "game_over": game_over,
+        "message": game_message,
+        "result": result,
+    }
+
+
+def get_game_result(turn):
+    if turn >= 100:
+        return True, "You survived 100 turns and built a rocket to escape! You win."
+    if pop <= 0:
+        return True, "You have no more people! You lose."
+    if pop >= 100:
+        return True, "Your population is too big for your colony. You lose."
+    if res <= 0:
+        return True, "You ran out of resources! You lose."
+    if res >= 100:
+        return True, "The people have become spoiled with resources and revolted against you! You lose."
+    if fund <= 0:
+        return True, "Your government stopped giving you funding! You lose."
+    if fund >= 100:
+        return True, "The government ran out of money to give to you! You lose."
+    if rel <= 0:
+        return True, "The entire crew mutinied and overthrew you! You lose."
+    if rel >= 100:
+        return True, "You were unable to sustain your abundance of relationships, and they all hate you! You lose."
+    if u <= 0:
+        return True, "You died! You lose."
+    return False, ""
+
 
 def main():
     global pop, res, fund, rel, u, run
@@ -177,7 +319,7 @@ def main():
 
     while True:
 
-        dependent_event, upcoming_events = do_turn(all_stats, upcoming_events) # list of all stats updated and dependent event returned so it can be added to events_running
+        dependent_event, upcoming_events, _ = do_turn(all_stats, upcoming_events) # list of all stats updated and dependent event returned so it can be added to events_running
         next_event = upcoming_events[0] if upcoming_events else None
 
         if dependent_event != "":
@@ -225,7 +367,7 @@ def main():
        
        
 
-def do_turn(all_stats, upcoming_events):
+def do_turn(all_stats, upcoming_events, answer=None, event=None):
     global pop, res, fund, rel, u
     dependent_event = ""
 
@@ -236,7 +378,8 @@ def do_turn(all_stats, upcoming_events):
     rel_ch = 0
     you_ch = 0
    
-    event, upcoming_events = choose_event(upcoming_events)
+    if event is None:
+        event, upcoming_events = choose_event(upcoming_events)
 
 
     initial_text = event[0]
@@ -253,7 +396,8 @@ def do_turn(all_stats, upcoming_events):
     print(initial_text)
 
    
-    answer = input("yes or no: ") # TODO: get answer from button user clicks on website
+    if answer is None:
+        answer = input("yes or no: ")
     while answer != "yes" and answer != "no":
         answer = input("Invalid resonse! Please enter 'yes' or 'no': ")
 
@@ -348,7 +492,7 @@ def do_turn(all_stats, upcoming_events):
     u = round(u, 2)
 
 
-    return dependent_event, upcoming_events
+    return dependent_event, upcoming_events, text
 
 
 
@@ -376,8 +520,4 @@ def choose_event(upcoming_events):
 
 
 if __name__ == "__main__":
-    threading.Thread(
-        target=lambda: app.run(debug=False, use_reloader=False),
-        daemon=True,
-    ).start()
-    main()
+    app.run(debug=False, use_reloader=False)
