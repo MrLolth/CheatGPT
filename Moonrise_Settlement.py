@@ -38,7 +38,6 @@ def game_state():
         return jsonify(state_payload())
 
 @app.route("/api/action", methods=["POST"])
-@app.route("/api/action", methods=["POST"])
 def submit_action():
     global current_event, upcoming_events, game_turn, game_over, game_message, last_result
     global pop, res, fund, rel  # Explicitly pull in the global stat tracking variables
@@ -67,11 +66,14 @@ def submit_action():
         )
         current_event = None
 
-        # 2. Write the freshly calculated dictionary outputs back to your global variables
-        pop = all_stats["Population"]
-        res = all_stats["Resources"]
-        fund = all_stats["Funding"]
-        rel = all_stats["Relations"]
+        # Keep the shared stats dictionary in sync with the values do_turn updated.
+        all_stats.update({
+            "Population": pop,
+            "Resources": res,
+            "Funding": fund,
+            "Relations": rel,
+            "You": u,
+        })
 
         if dependent_event:
             events_running[dependent_event] = events[dependent_event]
