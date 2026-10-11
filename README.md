@@ -1,0 +1,3 @@
+The website currently does not work. The current best way to play the game is in the terminal by running Moonrise_Settlement.py.
+
+Moonrise Settlement is a simple decision-making game where you have to manage a lunar colony and keep its population, resources, funding, and relations under control. Make decisions as the colony leader to decide what to do. If you can survive for 100 turns, you build a rocket to escape and win, but if you have too many or too little people, resources, funds, or relations, you'll die. Have fun!
