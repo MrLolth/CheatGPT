@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {
+            background-color: #172466;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* The Moon container - handles the giant layout scale safely */
+        .bottom-image {
+            position: fixed;
+            bottom: -30%; /* Pushes 30% of the moon below the screen */
+            left: 50%;
+            transform: translateX(-50%); 
+            display: block;
+            width: 1600px; 
+            max-width: 180vw; /* Keeps it scalable on smaller screens */
+            height: auto;
+            z-index: 1;
+            pointer-events: none; /* Allows clicking "through" the empty space of the image */
+        }
+
+        /* The Astronaut container - anchors safely relative to the viewport bottom */
+        .astronaut {
+            position: fixed;
+            bottom: 15%; /* Sits safely above the moon horizon */
+            left: 50%;
+            transform: translateX(-50%); 
+            display: block;
+            width: 266px;
+            height: auto;
+            z-index: 2;
+        }
+
+        .progress-wrapper {
+            position: fixed;
+            top: 80px;
+            left: 20%;
+            transform: translateX(-50%);
+            z-index: 3;
+            box-sizing: border-box;
+            width: min(420px, calc(100vw - 32px));
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(23, 36, 102, 0.92);
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .progress-wrapper2 {
+            position: fixed;
+            top: 80px;
+            left: 40%;
+            transform: translateX(-50%);
+            z-index: 3;
+            box-sizing: border-box;
+            width: min(420px, calc(100vw - 32px));
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(23, 36, 102, 0.92);
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .progress-wrapper3 {
+            position: fixed;
+            top: 80px;
+            left: 60%;
+            transform: translateX(-50%);
+            z-index: 3;
+            box-sizing: border-box;
+            width: min(420px, calc(100vw - 32px));
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(23, 36, 102, 0.92);
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .progress-wrapper4 {
+            position: fixed;
+            top: 80px;
+            left: 80%;
+            transform: translateX(-50%);
+            z-index: 3;
+            box-sizing: border-box;
+            width: min(420px, calc(100vw - 32px));
+            padding: 18px 22px;
+            border-radius: 12px;
+            background: rgba(23, 36, 102, 0.92);
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .stat-info h3 {
+            margin: 0 0 8px;
+        }
+
+        .stat-info p {
+            margin: 0 0 10px;
+        }
+
+.progress-track {
+    display: block;
+    width: 28px;
+    height: 180px;
+    margin: 12px auto;
+    writing-mode: vertical-lr;
+    direction: rtl;
+}
+
+#population-progress {
+    accent-color: #55d187;
+}
+
+#resource-progress {
+    accent-color: #55aaff;
+}
+
+#fund-progress {
+    accent-color: #B76EFF;
+}
+
+#relationship-progress {
+    accent-color: #FFB347;
+}
+
+        #population-error {
+            margin: 10px 0 0;
+            color: #ffd1d1;
+        }
+        #resource-error {
+            margin: 10px 0 0;
+            color: #ffd1d1;
+        }
+        #fund-error {
+            margin: 10px 0 0;
+            color: #ffd1d1;
+        }
+        #relationship-error {
+            margin: 10px 0 0;
+            color: #ffd1d1;
+        }
+    </style>
+</head>
+<body>
+    <img src="/static/moon2.png" alt="Moon" class="bottom-image">
+    <img src="/static/astronaut.png" alt="Astronaut" class="astronaut">
+    
+    <div class="progress-wrapper">
+        <div class="stat-info">
+            <h3>Population</h3>
+            <p><span id="population-count">{{ pop }}</span> / 100</p>
+        </div>
+
+        <progress
+            class="progress-track"
+            id="population-progress"
+            value="{{ pop }}"
+            max="100"
+            aria-label="Population out of 100"
+        >{{ pop }} / 100</progress>
+        <p id="population-error" role="status" hidden>Population could not be refreshed.</p>
+    </div>
+
+    <div class="progress-wrapper2">
+        <div class="stat-info">
+            <h3>Resources</h3>
+            <p><span id="resource-count">50</span> / 100</p>
+        </div>
+
+        <progress
+            class="progress-track"
+            id="resource-progress"
+            value="{{ res }}"
+            max="100"
+            aria-label="Resources out of 100"
+        >50 / 100</progress>
+    </div>
+
+    <div class="progress-wrapper3">
+        <div class="stat-info">
+            <h3>Funds</h3>
+            <p><span id="fund-count">50</span> / 100</p>
+        </div>
+
+        <progress
+            class="progress-track"
+            id="fund-progress"
+            value="{{ fund }}"
+            max="100"
+            aria-label="Funds out of 100"
+        >50 / 100</progress>
+    </div>
+
+    <div class="progress-wrapper4">
+        <div class="stat-info">
+            <h3>Relationships</h3>
+            <p><span id="relationship-count">50</span> / 100</p>
+        </div>
+
+        <progress
+            class="progress-track"
+            id="relationshpip-progress"
+            value="{{ rel }}"
+            max="100"
+            aria-label="Relationships out of 100"
+        >50 / 100</progress>
+    </div>
+
+<script>
+    const populationProgress = document.getElementById("population-progress");
+    const populationCount = document.getElementById("population-count");
+    const populationError = document.getElementById("population-error");
+    const resourceProgress = document.getElementById("resource-progress");
+    const resourceCount = document.getElementById("resource-count");
+    const resourceError = document.getElementById("resource-error");
+    const fundProgress = document.getElementById("fund-progress");
+    const fundCount = document.getElementById("fund-count");
+    const fundError = document.getElementById("fund-error");
+    const relationshipProgress = document.getElementById("relationship-progress");
+    const relationshipCount = document.getElementById("relationship-count");
+    const relationshipError = document.getElementById("relationship-error");
+
+    async function updatePopulation() {
+        try {
+            const response = await fetch("/api/population", { cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Population request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!Number.isFinite(data.population)) {
+                throw new Error("Population response was not a number.");
+            }
+
+            populationProgress.value = Math.max(0, Math.min(data.population, 100));
+            populationCount.textContent = data.population;
+            populationError.hidden = true;
+        } catch (error) {
+            console.error("Could not refresh population.", error);
+            populationError.hidden = false;
+        }
+    }
+
+    async function updateResources() {
+        try {
+            const response = await fetch("/api/resources", { cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Resource request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!Number.isFinite(data.resources)) {
+                throw new Error("Resource response was not a number.");
+            }
+
+            resourceProgress.value = Math.max(0, Math.min(data.population, 100));
+            resourceCount.textContent = data.resources;
+            resourceError.hidden = true;
+        } catch (error) {
+            console.error("Could not refresh resources.", error);
+            resourceError.hidden = false;
+        }
+    }
+
+    async function updateFunds() {
+        try {
+            const response = await fetch("/api/funds", { cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Fund request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!Number.isFinite(data.funds)) {
+                throw new Error("Fund response was not a number.");
+            }
+
+            fundProgress.value = Math.max(0, Math.min(data.funds, 100));
+            fundCount.textContent = data.funds;
+            fundError.hidden = true;
+        } catch (error) {
+            console.error("Could not refresh funds.", error);
+            fundError.hidden = false;
+        }
+    }
+
+    async function updateRelationships() {
+        try {
+            const response = await fetch("/api/relationships", { cache: "no-store" });
+            if (!response.ok) {
+                throw new Error(`Fund request failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!Number.isFinite(data.relationships)) {
+                throw new Error("Relationship response was not a number.");
+            }
+
+            relationshipProgress.value = Math.max(0, Math.min(data.funds, 100));
+            relationshipCount.textContent = data.relationships;
+            relationshipError.hidden = true;
+        } catch (error) {
+            console.error("Could not refresh relationships.", error);
+            relationshipError.hidden = false;
+        }
+    }
+
+    updatePopulation();
+    window.setInterval(updateFunds, 1000);
+
+    updateResources();
+    window.setInterval(updateFunds, 1000);
+
+    updateFunds();
+    window.setInterval(updateFunds, 1000);
+
+    updateRelationships();
+    window.setInterval(updateFunds, 1000);
+
+</script>
+</body>
+</html>
